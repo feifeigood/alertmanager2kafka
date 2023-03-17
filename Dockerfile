@@ -1,25 +1,38 @@
-FROM golang:1.15 as build
+#############################################
+# Build
+#############################################
+FROM --platform=$BUILDPLATFORM golang:1.18-alpine as build
 
-WORKDIR /go/src/github.com/webdevops/alertmanager2kafka
+RUN apk upgrade --no-cache --force
+RUN apk add --update build-base make git
 
-# Get deps (cached)
-COPY ./go.mod /go/src/github.com/webdevops/alertmanager2kafka
-COPY ./go.sum /go/src/github.com/webdevops/alertmanager2kafka
-COPY ./Makefile /go/src/github.com/webdevops/alertmanager2kafka
-RUN make dependencies
+WORKDIR /go/src/github.com/feifeigood/alertmanager2kafka
+
+# Dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
 # Compile
-COPY ./ /go/src/github.com/webdevops/alertmanager2kafka
+COPY . .
 RUN make test
-RUN make lint
-RUN make build
-RUN ./alertmanager2kafka --help
+ARG TARGETOS TARGETARCH
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} make build
 
 #############################################
-# FINAL IMAGE
+# Test
+#############################################
+FROM gcr.io/distroless/static as test
+USER 0:0
+WORKDIR /app
+COPY --from=build /go/src/github.com/feifeigood/alertmanager2kafka/alertmanager2kafka .
+RUN ["./alertmanager2kafka", "--help"]
+
+#############################################
+# Final
 #############################################
 FROM gcr.io/distroless/static
 ENV LOG_JSON=1
-COPY --from=build /go/src/github.com/webdevops/alertmanager2kafka/alertmanager2kafka /
-USER 1000
+WORKDIR /
+COPY --from=test /app .
+USER 1000:1000
 ENTRYPOINT ["/alertmanager2kafka"]
