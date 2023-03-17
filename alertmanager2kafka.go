@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	kafka "github.com/segmentio/kafka-go"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	kafka "github.com/segmentio/kafka-go"
+	log "github.com/sirupsen/logrus"
 )
 
 const supportedWebhookVersion = "4"
@@ -88,8 +89,7 @@ func (e *AlertmanagerKafkaExporter) Init() {
 	prometheus.MustRegister(e.prometheus.alertsSuccessful)
 }
 
-func (e *AlertmanagerKafkaExporter) ConnectKafka(host string, topic string, sslConfig *KafkaSSLConfig) {
-	dialer := kafka.DefaultDialer
+func (e *AlertmanagerKafkaExporter) ConnectKafka(host string, topic string, sslConfig *KafkaSSLConfig, dialer *kafka.Dialer) {
 	if sslConfig.EnableSSL {
 		cert, err := tls.LoadX509KeyPair(sslConfig.CertFile, sslConfig.KeyFile)
 		if err != nil {

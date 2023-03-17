@@ -2,15 +2,19 @@ package main
 
 import (
 	"fmt"
-	"github.com/fpytloun/alertmanager2kafka/config"
-	"github.com/jessevdk/go-flags"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/feifeigood/alertmanager2kafka/config"
+	"github.com/jessevdk/go-flags"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	kafka "github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/sasl/scram"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -45,7 +49,22 @@ func main() {
 	} else {
 		sslConfig.EnableSSL = false
 	}
-	exporter.ConnectKafka(opts.Kafka.Host, opts.Kafka.Topic, sslConfig)
+
+	dialer := kafka.DefaultDialer
+	if opts.Kafka.Username != "" && opts.Kafka.Password != "" {
+		mechanism, err := scram.Mechanism(scram.SHA256, opts.Kafka.Username, opts.Kafka.Password)
+		if err != nil {
+			log.Fatalf("create SASL mechanism err: %s", err)
+		}
+
+		dialer = &kafka.Dialer{
+			Timeout:       10 * time.Second,
+			DualStack:     true,
+			SASLMechanism: mechanism,
+		}
+	}
+
+	exporter.ConnectKafka(opts.Kafka.Host, opts.Kafka.Topic, sslConfig, dialer)
 	defer exporter.kafkaWriter.Close()
 
 	// daemon mode
